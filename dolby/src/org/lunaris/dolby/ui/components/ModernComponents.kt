@@ -6,8 +6,10 @@
 package org.lunaris.dolby.ui.components
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -19,7 +21,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.indication
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -29,6 +36,50 @@ import org.lunaris.dolby.R
 import org.lunaris.dolby.domain.models.ProfileSettings
 import org.lunaris.dolby.ui.viewmodel.DolbyViewModel
 import org.lunaris.dolby.utils.*
+
+@Composable
+fun Modifier.squishable(
+    enabled: Boolean = true,
+    scaleDown: Float = 0.93f
+): Modifier {
+    var isPressed by remember { mutableStateOf(false) }
+    
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed && enabled) scaleDown else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "squish_scale"
+    )
+    
+    return this
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+        .indication(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null
+        )
+        .pointerInput(enabled) {
+            if (enabled) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        when (event.type) {
+                            PointerEventType.Press -> {
+                                isPressed = true
+                            }
+                            PointerEventType.Release -> {
+                                isPressed = false
+                            }
+                        }
+                    }
+                }
+            }
+        }
+}
 
 @Composable
 fun DolbyMainCard(
@@ -43,7 +94,7 @@ fun DolbyMainCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
@@ -100,9 +151,30 @@ fun DolbyMainCard(
                             }
                             onEnabledChange(it)
                         },
+                        thumbContent = {
+                            Crossfade(targetState = enabled, label = "switch_icon") { isChecked ->
+                                if (isChecked) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Check,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Close,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = MaterialTheme.colorScheme.primary,
-                            checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                            checkedTrackColor = MaterialTheme.colorScheme.primaryContainer,
+                            checkedIconColor = MaterialTheme.colorScheme.onPrimary,
+                            uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                            uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                            uncheckedIconColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
                 }
@@ -239,7 +311,32 @@ fun ModernSettingSwitch(
                         haptic.performHaptic(HapticFeedbackHelper.HapticIntensity.DOUBLE_CLICK)
                     }
                     onCheckedChange(it)
-                }
+                },
+                thumbContent = {
+                    Crossfade(targetState = checked, label = "switch_icon") { isChecked ->
+                        if (isChecked) {
+                            Icon(
+                                imageVector = Icons.Rounded.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer,
+                    checkedIconColor = MaterialTheme.colorScheme.onPrimary,
+                    uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    uncheckedIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             )
         }
     }
@@ -492,7 +589,9 @@ private fun IeqTile(
             }
             onPresetChange(value) 
         },
-        modifier = modifier.height(72.dp),
+        modifier = modifier
+            .height(72.dp)
+            .squishable(enabled = true, scaleDown = 0.93f),
         color = if (isSelected)
             MaterialTheme.colorScheme.primaryContainer
         else
